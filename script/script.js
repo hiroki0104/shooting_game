@@ -9,7 +9,7 @@
     canvas = util.canvas
     ctx = util.context
 
-    util.imageLoader('./../img/viper.png', loadedImage => {
+    util.imageLoader('./img/viper.png', loadedImage => {
       image = loadedImage
       initialize()
       render()
