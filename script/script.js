@@ -36,21 +36,21 @@
 
   function eventSetting() {
     window.addEventListener('keydown', event => {
-      if (isComing === true) {
+      if (viper.isComing === true) {
         return
       }
       switch (event.key) {
         case 'ArrowLeft':
-          viperX -= 10
+          viper.position.x -= 10
           break
         case 'ArrowRight':
-          viperX += 10
+          viper.position.x += 10
           break
         case 'ArrowUp':
-          viperY -= 10
+          viper.position.y -= 10
           break
         case 'ArrowDown':
-          viperY += 10
+          viper.position.y += 10
           break
       }
     })

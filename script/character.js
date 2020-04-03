@@ -19,9 +19,12 @@ class Position {
 class Character {
   constructor(ctx, x, y, life, image) {
     this.ctx = ctx
-    this.position = new Position(x, y)
+    this.position = this.setPosition(x, y)
     this.life = life
     this.image = image
+  }
+  setPosition(x, y) {
+    return new Position(x, y)
   }
   draw() {
     this.ctx.drawImage(this.image, this.position.x, this.position.y)
