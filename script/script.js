@@ -1,12 +1,11 @@
 ;(() => {
   const CANVAS_WIDTH = 640
+  const CANVAS_WWIDTH_HALF = CANVAS_WIDTH / 2
   const CANVAS_HEIGHT = 480
 
   let util, canvas, ctx, image, startTime
   //  自機の現在地
-  let [viperX, viperY] = [CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2]
-  let isComing = false
-  let comingStart
+  let viper
   window.addEventListener('load', () => {
     util = new Canvas2DUtility(document.getElementById('main_canvas'))
     canvas = util.canvas
@@ -26,9 +25,13 @@
     canvas.height = CANVAS_HEIGHT
 
     // 登場シーンからスタートするための設定
-    isComing = true
-    comingStart = Date.now() // 登場開始時のタイムスタンプの取得
-    viperY = CANVAS_HEIGHT
+    viper = new Viper(ctx, 0, 0, image)
+    viper.setComing(
+      CANVAS_WWIDTH_HALF, // 登場演出時の開始X座標
+      CANVAS_HEIGHT, // 登場演出時の開始Y座標
+      CANVAS_WWIDTH_HALF,
+      CANVAS_HEIGHT - 100
+    )
   }
 
   function eventSetting() {
@@ -61,20 +64,22 @@
     // let s = Math.sin(nowTime)
     // -1.0 ~ 1.0 を百倍
     // let x = s * 100.0
-    if (isComing === true) {
+    if (viper.isComing === true) {
       let justTime = Date.now()
-      let comingTime = (justTime - comingStart) / 1000
-      viperY = CANVAS_HEIGHT - comingTime * 50
-      if (viperY <= CANVAS_HEIGHT - 100) {
-        isComing = false
-        viperY = CANVAS_HEIGHT - 100
+      let comingTime = (justTime - viper.comingStart) / 1000
+      let y = CANVAS_HEIGHT - comingTime * 50
+      if (y <= viper.comingEndPosition.y) {
+        viper.isComing = false
+        y = viper.comingEndPosition.y
       }
+      viper.position.set(viper.position.x, y)
       if (justTime % 100 < 50) {
         ctx.globalAlpah = 0.5
       }
     }
-    ctx.drawImage(image, viperX, viperY)
-    // requestAnimationFrame(render)
+
+    viper.draw()
+    requestAnimationFrame(render)
   }
 
   function generateRandomInt(range) {
