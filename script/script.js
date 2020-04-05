@@ -9,7 +9,7 @@
   let util, canvas, ctx, image, startTime, viper
 
   let shotArray = []
-
+  let singleShotArray = []
   window.addEventListener('load', () => {
     util = new Canvas2DUtility(document.getElementById('main_canvas'))
     canvas = util.canvas
@@ -34,8 +34,24 @@
 
     for (let i = 0; i < SHOT_MAX_COUNT; ++i) {
       shotArray[i] = new Shot(ctx, 0, 0, 32, 32, './../img/viper_shot.png')
+      singleShotArray[i * 2] = new Shot(
+        ctx,
+        0,
+        0,
+        32,
+        32,
+        './../img/viper_single_shot.png'
+      )
+      singleShotArray[i * 2 + 1] = new Shot(
+        ctx,
+        0,
+        0,
+        32,
+        32,
+        './../img/viper_single_shot.png'
+      )
     }
-    viper.setShotArray(shotArray)
+    viper.setShotArray(shotArray, singleShotArray)
   }
 
   // インスタンスの準備が完了しているかどうか確認する
@@ -45,7 +61,9 @@
     shotArray.map(v => {
       ready = ready && v.ready
     })
-
+    singleShotArray.map(v => {
+      ready = ready && v.ready
+    })
     if (ready === true) {
       eventSetting()
       startTime = Date.now()
@@ -75,6 +93,9 @@
     // let x = s * 100.0
     viper.update()
     shotArray.map(v => {
+      v.update()
+    })
+    singleShotArray.map(v => {
       v.update()
     })
     requestAnimationFrame(render)
