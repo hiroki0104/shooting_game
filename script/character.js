@@ -19,7 +19,9 @@ class Position {
 class Character {
   constructor(ctx, x, y, w, h, life, imagePath) {
     this.ctx = ctx
-    this.position = this.setPosition(x, y)
+    this.position = new Position(x, y)
+    this.vector = new Position(0.0, -1.0)
+    this.angle = (270 * Math.PI) / 180
     this.width = w
     this.height = h
     this.life = life
@@ -30,9 +32,19 @@ class Character {
     })
     this.image.src = imagePath
   }
-  setPosition(x, y) {
-    return new Position(x, y)
+  // x方向の移動量、y方向の移動量
+  setVector(x, y) {
+    this.vector.set(x, y)
   }
+  // 自身の回転量を設定する
+  setVectorFromAngle(angle) {
+    this.angle = angle
+    let sin = Math.sin(angle)
+    let cos = Math.cos(angle)
+
+    this.vector.set(cos, sin)
+  }
+  // キャラクターの描画
   draw() {
     let offSetX = this.width / 2
     let offSetY = this.height / 2
@@ -43,6 +55,18 @@ class Character {
       this.width,
       this.height
     )
+  }
+
+  // 自身の回転量から座標系を回転させる
+  rotationDraw() {
+    this.ctx.save()
+    this.ctx.translate(this.position.x, this.position.y)
+    // 270度の位置を基準にする
+    this.ctx.rotate(this.angle - Math.PI * 1.5)
+    let offSetX = this.width / 2
+    let offSetY = this.height / 2
+    this.ctx.drawImage(this.image, -offSetX, -offSetY, this.width, this.height)
+    this.ctx.restore()
   }
 }
 
@@ -70,7 +94,7 @@ class Viper extends Character {
     this.comingEndPosition = new Position(endX, endY)
   }
 
-  setShotArray(shotArray,singleShotArray) {
+  setShotArray(shotArray, singleShotArray) {
     this.shotArray = shotArray
     this.singleShotArray = singleShotArray
   }
@@ -121,15 +145,22 @@ class Viper extends Character {
             }
           }
 
-          for(let j = 0; j < this.singleShotArray.length; j += 2){
-             if(this.singleShotArray[j].life <= 0 && this.singleShotArray[j + 1].life <= 0){
-                 this.singleShotArray[j].set(this.position.x, this.position.y)
-                 this.singleShotArray[j].setVector(0.2,-0.9)
-                 this.singleShotArray[j + 1].set(this.position.x, this.position.y)
-                 this.singleShotArray[j + 1].setVector(-0.2,-0.9)
-                 this.shotCheckCounter = -this.shotInterval
-                 break
-             }
+          for (let j = 0; j < this.singleShotArray.length; j += 2) {
+            if (
+              this.singleShotArray[j].life <= 0 &&
+              this.singleShotArray[j + 1].life <= 0
+            ) {
+              // 真上の方向（２７０度）から左右に１０度傾いたラジアン
+              let radCW = (280 * Math.PI) / 180
+              let radCCW = (260 * Math.PI) / 180
+
+              this.singleShotArray[j].set(this.position.x, this.position.y)
+              this.singleShotArray[j].setVectorFromAngle(radCW)
+              this.singleShotArray[j + 1].set(this.position.x, this.position.y)
+              this.singleShotArray[j + 1].setVectorFromAngle(radCCW)
+              this.shotCheckCounter = -this.shotInterval
+              break
+            }
           }
         }
       }
@@ -139,6 +170,32 @@ class Viper extends Character {
 
     this.draw()
     this.ctx.globalAlpah = 1.0
+  }
+}
+
+// 敵キャラクターのクラス
+class Enemy extends Character {
+  constructor(ctx, x, y, w, h, imagePath) {
+    super(ctx, x, y, w, h, 0, imagePath)
+    this.speed = 3
+  }
+
+  set(x, y, life = 1) {
+    this.position.set(x, y)
+    this.life = life
+  }
+
+  update() {
+    if (this.life <= 0) {
+      return
+    }
+    if (this.position.y - this.height > this.ctx.canvas.height) {
+      this.life = 0
+    }
+    this.position.x += this.vector.x * this.speed
+    this.position.y += this.vector.y * this.speed
+
+    this.draw()
   }
 }
 
@@ -155,9 +212,9 @@ class Shot extends Character {
     this.life = 1
   }
 
-  setVector(x, y) {
-    this.vector.set(x, y)
-  }
+  // setVector(x, y) {
+  //   this.vector.set(x, y)
+  // }
 
   update() {
     if (this.life <= 0) {
@@ -168,6 +225,6 @@ class Shot extends Character {
     }
     this.position.x += this.vector.x * this.speed
     this.position.y += this.vector.y * this.speed
-    this.draw()
+    this.rotationDraw()
   }
 }
