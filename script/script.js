@@ -6,12 +6,15 @@
   const CANVAS_HEIGHT = 480
   const SHOT_MAX_COUNT = 10
   const ENEMY_MAX_COUNT = 10
-
+  const ENEMY_SHOT_MAX_COUNT = 50
+  const EXPLOSION_MAX_COUNT = 10
   let util, canvas, ctx, image, startTime, viper, scene
 
   let enemyArray = []
+  let enemyShotArray = []
   let shotArray = []
   let singleShotArray = []
+  let explosionArray = []
   window.addEventListener('load', () => {
     util = new Canvas2DUtility(document.getElementById('main_canvas'))
     canvas = util.canvas
@@ -28,6 +31,46 @@
     // シーンの初期化
     scene = new SceneManager()
 
+    for (let i = 0; i < EXPLOSION_MAX_COUNT; ++i) {
+      explosionArray[i] = new Explosion(ctx, 50.0, 15, 30.0, 0.25)
+    }
+
+    let ec
+    for (ec = 0; ec < ENEMY_SHOT_MAX_COUNT; ++ec) {
+      enemyShotArray[ec] = new Shot(
+        ctx,
+        0,
+        0,
+        32,
+        32,
+        './../img/enemy_shot.png'
+      )
+    }
+    for (ec = 0; ec < ENEMY_MAX_COUNT; ++ec) {
+      enemyArray[ec] = new Enemy(ctx, 0, 0, 48, 48, './../img/enemy_small.png')
+      enemyArray[ec].setShotArray(enemyShotArray)
+    }
+
+    let mc
+    for (mc = 0; mc < SHOT_MAX_COUNT; ++mc) {
+      shotArray[mc] = new Shot(ctx, 0, 0, 32, 32, './../img/viper_shot.png')
+      singleShotArray[mc * 2] = new Shot(
+        ctx,
+        0,
+        0,
+        32,
+        32,
+        './../img/viper_single_shot.png'
+      )
+      singleShotArray[mc * 2 + 1] = new Shot(
+        ctx,
+        0,
+        0,
+        32,
+        32,
+        './../img/viper_single_shot.png'
+      )
+    }
     // 登場シーンからスタートするための設定
     viper = new Viper(ctx, 0, 0, 64, 64, './../img/viper.png')
     viper.setComing(
@@ -37,30 +80,16 @@
       CANVAS_HEIGHT - 100
     )
 
-    for (let j = 0; j < ENEMY_MAX_COUNT; ++j) {
-      enemyArray[j] = new Enemy(ctx, 0, 0, 48, 48, './../img/enemy_small.png')
-    }
-
-    for (let i = 0; i < SHOT_MAX_COUNT; ++i) {
-      shotArray[i] = new Shot(ctx, 0, 0, 32, 32, './../img/viper_shot.png')
-      singleShotArray[i * 2] = new Shot(
-        ctx,
-        0,
-        0,
-        32,
-        32,
-        './../img/viper_single_shot.png'
-      )
-      singleShotArray[i * 2 + 1] = new Shot(
-        ctx,
-        0,
-        0,
-        32,
-        32,
-        './../img/viper_single_shot.png'
-      )
-    }
     viper.setShotArray(shotArray, singleShotArray)
+
+    for (mc = 0; mc < SHOT_MAX_COUNT; ++mc) {
+      shotArray[mc].setTargets(enemyArray)
+      singleShotArray[mc * 2].setTargets(enemyArray)
+      singleShotArray[mc * 2 + 1].setTargets(enemyArray)
+      shotArray[mc].setExplosions(explosionArray)
+      singleShotArray[mc * 2].setExplosions(explosionArray)
+      singleShotArray[mc * 2 + 1].setExplosions(explosionArray)
+    }
   }
 
   // インスタンスの準備が完了しているかどうか確認する
@@ -69,6 +98,9 @@
     ready = ready && viper.ready
 
     enemyArray.map(v => {
+      ready = ready && v.ready
+    })
+    enemyShotArray.map(v => {
       ready = ready && v.ready
     })
     shotArray.map(v => {
@@ -104,23 +136,25 @@
       }
     })
     scene.add('invade', time => {
-      if (scene.frame !== 0) {
-        return
-      }
-      for (let i = 0; i < ENEMY_MAX_COUNT; ++i) {
-        if (enemyArray[i].life <= 0) {
-          let e = enemyArray[i]
-          e.set(CANVAS_WWIDTH_HALF, -e.height)
-          e.setVector(0.0, 1.0)
-          break
+      if (scene.frame === 0) {
+        for (let i = 0; i < ENEMY_MAX_COUNT; ++i) {
+          if (enemyArray[i].life <= 0) {
+            let e = enemyArray[i]
+            e.set(CANVAS_WWIDTH_HALF, -e.height, 2, 'default')
+            e.setVector(0.0, 1.0)
+            break
+          }
         }
+      }
+      if (scene.frame === 100) {
+        scene.use('invade')
       }
     })
 
     scene.use('intro')
   }
   function render() {
-    ctx.globalAlpah = 1.0
+    ctx.globalAlpha = 1.0
     util.drawRact(0, 0, canvas.width, canvas.height, '#eeeeee')
     // ミリ秒を秒に換算する
     let nowTime = (Date.now() - startTime) / 1000
@@ -129,15 +163,19 @@
     // let x = s * 100.0
     scene.update()
     viper.update()
-    shotArray.map(v => {
-      v.update()
-    })
-
     enemyArray.map(v => {
       v.update()
     })
-
+    shotArray.map(v => {
+      v.update()
+    })
     singleShotArray.map(v => {
+      v.update()
+    })
+    enemyShotArray.map(v => {
+      v.update()
+    })
+    explosionArray.map(v => {
       v.update()
     })
     requestAnimationFrame(render)

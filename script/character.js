@@ -13,6 +13,13 @@ class Position {
       this.y = y
     }
   }
+
+  // targetとの距離を図る
+  distance(target) {
+    let x = this.x - target.x
+    let y = this.y - target.y
+    return Math.sqrt(x * x + y * y)
+  }
 }
 
 // キャラクター管理のための基幹クラス
@@ -110,7 +117,7 @@ class Viper extends Character {
       }
       this.position.set(this.position.x, y)
       if (justTime % 100 < 50) {
-        this.ctx.globalAlpah = 0.5
+        this.ctx.globalAlpha = 0.5
       }
     } else {
       if (window.isKeyDown.key_ArrowLeft === true) {
@@ -140,6 +147,7 @@ class Viper extends Character {
           for (let i = 0; i < this.shotArray.length; i++) {
             if (this.shotArray[i].life <= 0) {
               this.shotArray[i].set(this.position.x, this.position.y)
+              this.shotArray[i].setPower(2)
               this.shotCheckCounter = -this.shotInterval
               break
             }
@@ -178,24 +186,53 @@ class Enemy extends Character {
   constructor(ctx, x, y, w, h, imagePath) {
     super(ctx, x, y, w, h, 0, imagePath)
     this.speed = 3
+    this.type = 'default'
+    this.frame = 0
+    this.shotArray = null
   }
 
-  set(x, y, life = 1) {
+  set(x, y, life = 1, type = 'default') {
     this.position.set(x, y)
     this.life = life
+    this.type = type
+    this.frame = 0
+  }
+
+  setShotArray(shotArray) {
+    this.shotArray = shotArray
   }
 
   update() {
     if (this.life <= 0) {
       return
     }
-    if (this.position.y - this.height > this.ctx.canvas.height) {
-      this.life = 0
-    }
-    this.position.x += this.vector.x * this.speed
-    this.position.y += this.vector.y * this.speed
 
+    switch (this.type) {
+      case 'default':
+      default:
+        if (this.frame === 50) {
+          this.fire()
+        }
+        this.position.x += this.vector.x * this.speed
+        this.position.y += this.vector.y * this.speed
+        if (this.position.y - this.height > this.ctx.canvas.height) {
+          this.life = 0
+        }
+        break
+    }
     this.draw()
+    ++this.frame
+  }
+
+  fire(x = 0.0, y = 1.0) {
+    for (let i = 0; i < this.shotArray.length; ++i) {
+      if (this.shotArray[i].life <= 0) {
+        this.shotArray[i].set(this.position.x, this.position.y)
+        this.shotArray[i].setSpeed(10.0)
+        this.shotArray[i].setVector(x, y)
+        break
+      }
+    }
   }
 }
 
@@ -203,6 +240,9 @@ class Shot extends Character {
   constructor(ctx, x, y, w, h, imagePath) {
     super(ctx, x, y, w, h, 0, imagePath)
     this.speed = 7
+    this.power = 1
+    this.targetArray = []
+    this.explosionArray = []
     // 進行方向のベクトル
     this.vector = new Position(0.0, -1.0)
   }
@@ -212,19 +252,138 @@ class Shot extends Character {
     this.life = 1
   }
 
+  setPower(power) {
+    if (power != null && power > 0) {
+      this.power = power
+    }
+  }
+
+  setTargets(targets) {
+    if (
+      targets != null &&
+      Array.isArray(targets) === true &&
+      targets.length > 0
+    ) {
+      this.targetArray = targets
+    }
+  }
+
+  setExplosions(targets) {
+    if (
+      targets != null &&
+      Array.isArray(targets) === true &&
+      targets.length > 0
+    ) {
+      this.explosionArray = targets
+    }
+  }
+
+  setSpeed(speed) {
+    if (speed != null && speed > 0) {
+      this.speed = speed
+    }
+  }
   // setVector(x, y) {
-  //   this.vector.set(x, y)
+  //   this.vector.set(x, y)z
   // }
 
   update() {
     if (this.life <= 0) {
       return
     }
-    if (this.position.y + this.height < 0) {
+    if (
+      this.position.y + this.height < 0 ||
+      this.position.y - this.height > this.ctx.canvas.height
+    ) {
       this.life = 0
     }
     this.position.x += this.vector.x * this.speed
     this.position.y += this.vector.y * this.speed
+
+    // ショットと対象との衝突判定をおこなう
+    this.targetArray.map(v => {
+      if (this.life <= 0 || v.life <= 0) {
+        return
+      }
+      let dist = this.position.distance(v.position)
+      if (dist <= (this.width + v.width) / 4) {
+        v.life -= this.power
+        if (v.life <= 0) {
+          for (let i = 0; i < this.explosionArray.length; ++i) {
+            // 爆発エフェクトの生成
+            if (this.explosionArray[i].life !== true) {
+              this.explosionArray[i].set(v.position.x, v.position.y)
+              break
+            }
+          }
+        }
+        this.life = 0
+      }
+    })
+
     this.rotationDraw()
+  }
+}
+
+class Explosion {
+  constructor(ctx, radius, count, size, timeRange, color = '#ff1166') {
+    this.ctx = ctx
+    // 爆発の生存状態を表す
+    this.life = false
+    this.color = color
+    this.position = null
+    // 爆発の広がりの半径
+    this.radius = radius
+    this.count = count
+    this.startTime = 0
+    this.timeRange = timeRange
+    this.fireSize = size
+    // 火花の位置を格納する
+    this.firePosition = []
+    // 火花の進行方向を格納する
+    this.fireVector = []
+  }
+
+  set(x, y) {
+    for (let i = 0; i < this.count; ++i) {
+      this.firePosition[i] = new Position(x, y)
+      let r = Math.random() * Math.PI * 2.0
+      let s = Math.sin(r)
+      let c = Math.cos(r)
+      this.fireVector[i] = new Position(s, c)
+    }
+
+    this.life = true
+    this.startTime = Date.now()
+  }
+
+  update() {
+    if (this.life !== true) {
+      return
+    }
+    console.log(this.fireVector)
+    this.ctx.fillStyle = this.color
+    this.ctx.globalAlpha = 0.5
+    let time = (Date.now() - this.startTime) / 1000
+    // 爆発終了までの時間で正規化する
+    let progress = Math.min(time / this.timeRange, 1.0)
+
+    for (let i = 0; i < this.firePosition.length; ++i) {
+      // 火花が広がる距離
+      let d = this.radius * progress
+      let x = this.firePosition[i].x + this.fireVector[i].x * d
+      let y = this.firePosition[i].y + this.fireVector[i].y * d
+
+      this.ctx.fillRect(
+        x - this.fireSize / 2,
+        y - this.fireSize / 2,
+        this.fireSize,
+        this.fireSize
+      )
+    }
+
+    if (progress >= 1.0) {
+      this.life = false
+    }
   }
 }
