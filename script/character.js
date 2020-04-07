@@ -80,7 +80,7 @@ class Character {
 // 自機のクラス
 class Viper extends Character {
   constructor(ctx, x, y, w, h, image) {
-    super(ctx, x, y, w, h, 0, image)
+    super(ctx, x, y, w, h, 1, image)
 
     this.speed = 3
     this.shotCheckCounter = 0
@@ -94,6 +94,7 @@ class Viper extends Character {
   }
 
   setComing(startX, startY, endX, endY) {
+    this.life = 1
     this.isComing = true
     this.comingStart = Date.now()
     this.position.set(startX, startY)
@@ -107,6 +108,9 @@ class Viper extends Character {
   }
 
   update() {
+    if (this.life <= 0) {
+      return
+    }
     let justTime = Date.now()
     if (this.isComing === true) {
       let comingTime = (justTime - this.comingStart) / 1000
@@ -307,6 +311,11 @@ class Shot extends Character {
       }
       let dist = this.position.distance(v.position)
       if (dist <= (this.width + v.width) / 4) {
+        if (v instanceof Viper === true) {
+          if (v.isComing === true) {
+            return
+          }
+        }
         v.life -= this.power
         if (v.life <= 0) {
           for (let i = 0; i < this.explosionArray.length; ++i) {
@@ -315,6 +324,10 @@ class Shot extends Character {
               this.explosionArray[i].set(v.position.x, v.position.y)
               break
             }
+          }
+
+          if (v instanceof Enemy === true) {
+            gameScore = Math.min(gameScore + 100, 99999)
           }
         }
         this.life = 0
@@ -337,7 +350,9 @@ class Explosion {
     this.count = count
     this.startTime = 0
     this.timeRange = timeRange
-    this.fireSize = size
+    this.fireBaseSize = size
+    // 火花の1つ当たりの大きさを格納する
+    this.fireSize = []
     // 火花の位置を格納する
     this.firePosition = []
     // 火花の進行方向を格納する
@@ -350,7 +365,11 @@ class Explosion {
       let r = Math.random() * Math.PI * 2.0
       let s = Math.sin(r)
       let c = Math.cos(r)
-      this.fireVector[i] = new Position(s, c)
+      // 進行方向ベクトルの長さをランダムに短くし移動量をランダム化する
+      let mr = Math.random()
+      this.fireVector[i] = new Position(mr * s, mr * c)
+      // 火花の大きさをランダム化する
+      this.fireSize[i] = (Math.random() * 0.5 + 0.5) * this.fireBaseSize
     }
 
     this.life = true
@@ -361,24 +380,25 @@ class Explosion {
     if (this.life !== true) {
       return
     }
-    console.log(this.fireVector)
     this.ctx.fillStyle = this.color
     this.ctx.globalAlpha = 0.5
     let time = (Date.now() - this.startTime) / 1000
-    // 爆発終了までの時間で正規化する
-    let progress = Math.min(time / this.timeRange, 1.0)
+    // 爆発終了までの時間で正規化して進捗度合いを算出する
+    let ease = simpleEaseIn(1.0 - Math.min(time / this.timeRange, 1.0))
+    let progress = 1.0 - ease
 
     for (let i = 0; i < this.firePosition.length; ++i) {
       // 火花が広がる距離
       let d = this.radius * progress
       let x = this.firePosition[i].x + this.fireVector[i].x * d
       let y = this.firePosition[i].y + this.fireVector[i].y * d
-
+      // 進捗を描かれる大きさにも反映させる
+      let s = 1.0 - progress
       this.ctx.fillRect(
-        x - this.fireSize / 2,
-        y - this.fireSize / 2,
-        this.fireSize,
-        this.fireSize
+        x - (this.fireSize[i] * s) / 2,
+        y - (this.fireSize[i] * s) / 2,
+        this.fireSize[i] * s,
+        this.fireSize[i] * s
       )
     }
 
@@ -386,4 +406,9 @@ class Explosion {
       this.life = false
     }
   }
+}
+
+// はじめゆっくり、あとで急に
+function simpleEaseIn(t) {
+  return t * t * t * t
 }
