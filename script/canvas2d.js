@@ -101,7 +101,7 @@ class Canvas2DUtility {
   }
 
   //   テキストを描画する
-  draText(text, x, y, color, width) {
+  drawText(text, x, y, color, width) {
     if (color != null) {
       this.context2d.fillStyle = color
     }
