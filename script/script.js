@@ -14,7 +14,7 @@
   const BACKGROUND_STAR_MAX_COUNT = 100
   const BACKGROUND_STAR_MAX_SIZE = 3
   const BACKGROUND_STAR_MAX_SPEED = 4
-  let util, canvas, ctx, image, startTime, viper, scene
+  let util, canvas, ctx, image, startTime, viper, scene, sound
   let restart = false
 
   let enemyArray = []
@@ -27,15 +27,26 @@
     util = new Canvas2DUtility(document.getElementById('main_canvas'))
     canvas = util.canvas
     ctx = util.context
-
-    initialize()
-    loadCheck()
-  })
-
-  function initialize() {
     canvas.width = CANVAS_WIDTH
     canvas.height = CANVAS_HEIGHT
 
+    let button = document.getElementById('start_button')
+    button.addEventListener('click', () => {
+      button.disabled = true
+      sound = new Sound()
+      sound.load('./../sound/explosion.mp3', error => {
+        if (error != null) {
+          alert('ファイルの読み込みエラーです')
+          return
+        }
+      })
+      initialize()
+      loadCheck()
+    })
+
+  })
+
+  function initialize() {
     // シーンの初期化
     scene = new SceneManager()
 
