@@ -10,15 +10,17 @@
   const ENEMY_SMALL_MAX_COUNT = 20
   const ENEMY_LARGE_MAX_COUNT = 5
   const ENEMY_SHOT_MAX_COUNT = 50
+  const HOMING_MAX_COUNT = 50
   const EXPLOSION_MAX_COUNT = 10
   const BACKGROUND_STAR_MAX_COUNT = 100
   const BACKGROUND_STAR_MAX_SIZE = 3
   const BACKGROUND_STAR_MAX_SPEED = 4
-  let util, canvas, ctx, image, startTime, viper, scene, sound
+  let util, canvas, ctx, image, startTime, viper, scene, sound, boss
   let restart = false
 
   let enemyArray = []
   let enemyShotArray = []
+  let homingArray = []
   let shotArray = []
   let singleShotArray = []
   let explosionArray = []
@@ -34,6 +36,7 @@
     button.addEventListener('click', () => {
       button.disabled = true
       sound = new Sound()
+      // 音声データの読み込み準備
       sound.load('./../sound/explosion.mp3', error => {
         if (error != null) {
           alert('ファイルの読み込みエラーです')
@@ -43,7 +46,6 @@
       initialize()
       loadCheck()
     })
-
   })
 
   function initialize() {
@@ -52,6 +54,8 @@
 
     for (let i = 0; i < EXPLOSION_MAX_COUNT; ++i) {
       explosionArray[i] = new Explosion(ctx, 50.0, 15, 30.0, 0.25)
+      // 爆発エフェクト時に効果音を再生
+      explosionArray[i].setSound(sound)
     }
     viper = new Viper(ctx, 0, 0, 64, 64, './../img/viper.png')
     viper.setComing(
@@ -92,6 +96,26 @@
       enemyArray[ENEMY_SMALL_MAX_COUNT + ec].setShotArray(enemyShotArray)
       enemyArray[ENEMY_SMALL_MAX_COUNT + ec].setAttackTarget(viper)
     }
+
+    // ホーミングショットの生成
+    for (ec = 0; ec < HOMING_MAX_COUNT; ++ec) {
+      homingArray[ec] = new Homing(
+        ctx,
+        0,
+        0,
+        32,
+        32,
+        './../img/homing_shot.png'
+      )
+      homingArray[ec].setTargets([viper])
+      homingArray[ec].setExplosions(explosionArray)
+    }
+
+    // ボスキャラクターの生成
+    boss = new Boss(ctx, 0, 0, 128, 128, './../img/boss.png')
+    boss.setShotArray(enemyShotArray)
+    boss.setHomingArray(homingArray)
+    boss.setAttackTarget(viper)
 
     // 自機キャラクターのショットの生成
     let mc
@@ -146,18 +170,11 @@
     let ready = true
     ready = ready && viper.ready
 
-    enemyArray.map(v => {
-      ready = ready && v.ready
-    })
-    enemyShotArray.map(v => {
-      ready = ready && v.ready
-    })
-    shotArray.map(v => {
-      ready = ready && v.ready
-    })
-    singleShotArray.map(v => {
-      ready = ready && v.ready
-    })
+    enemyArray.map(v => (ready = ready && v.ready))
+    enemyShotArray.map(v => (ready = ready && v.ready))
+    homingArray.map(v => (ready = ready && v.ready))
+    shotArray.map(v => (ready = ready && v.ready))
+    singleShotArray.map(v => (ready = ready && v.ready))
     if (ready === true) {
       eventSetting()
       sceneSetting()
@@ -183,6 +200,7 @@
     })
   }
 
+  //  シーンを設定する
   function sceneSetting() {
     scene.add('intro', time => {
       if (time > 3.0) {
@@ -263,10 +281,26 @@
       }
 
       if (scene.frame === 500) {
-        scene.use('intro')
+        scene.use('invade_boss')
       }
       if (viper.life <= 0) {
         scene.use('gameover')
+      }
+    })
+
+    scene.add('invade_boss', time => {
+      if (scene.frame === 0) {
+        boss.set(CANVAS_WIDTH / 2, -boss.height, 250)
+        boss.setMode('invade')
+      }
+
+      if (viper.life <= 0) {
+        scene.use('gameover')
+        boss.setMode('escape')
+      }
+
+      if (boss.life <= 0) {
+        scene.use('intro')
       }
     })
 
@@ -309,10 +343,12 @@
     scene.update()
     backgroundStarArray.map(v => v.update())
     viper.update()
+    boss.update()
     enemyArray.map(v => v.update())
     shotArray.map(v => v.update())
     singleShotArray.map(v => v.update())
     enemyShotArray.map(v => v.update())
+    homingArray.map(v => v.update())
     explosionArray.map(v => v.update())
     requestAnimationFrame(render)
   }
