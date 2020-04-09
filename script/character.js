@@ -1,5 +1,14 @@
 // 座標を管理するためのクラス
 class Position {
+  static calcLength(x, y) {
+    return Math.sqrt(x * x + y * y)
+  }
+
+  static calcNormal(x, y) {
+    let len = Position.calcLength(x, y)
+    return new Position(x / len, y / len)
+  }
+
   constructor(x, y) {
     this.x = null
     this.y = null
@@ -206,15 +215,56 @@ class Enemy extends Character {
     this.shotArray = shotArray
   }
 
+  setAttackTarget(target) {
+    this.attackTarget = target
+  }
+
   update() {
     if (this.life <= 0) {
       return
     }
 
     switch (this.type) {
+      case 'wave':
+        // 配置後のフレームが６０で割り切れるときにショットを放つ
+        if (this.frame % 60 === 0) {
+          let tx = this.attackTarget.position.x - this.position.x
+          let ty = this.attackTarget.position.y - this.position.y
+          // ベクトルを単位化する
+          let tv = Position.calcNormal(tx, ty)
+          // 自機キャラクターに向かうショット
+          this.fire(tv.x, tv.y, 4.0)
+        }
+        // x座礁はサイン波で、ｙ座標は一定量で変化する
+        this.position.x += Math.sin(this.frame / 10)
+        this.position.y += 2.0
+        // 画面外（画面下端）へ移動していたらライフを０
+        if (this.position.y - this.height > this.ctx.canvas.height) {
+          this.life = 0
+        }
+        break
+
+      case 'large':
+        if (this.frame % 50 === 0) {
+          for (let i = 0; i < 360; i += 45) {
+            // 45度間隔のラジアン
+            let r = (i * Math.PI) / 180
+            // ラジアンからサインとコサインを求める
+            let s = Math.sin(r)
+            let c = Math.cos(r)
+            this.fire(c, s, 3.0)
+          }
+        }
+        this.position.x += Math.sin((this.frame + 90) / 50) * 2.0
+        this.position.y += 1.0
+        if (this.position.y - this.height > this.ctx.canvas.hegiht) {
+          this.life = 0
+        }
+        break
+
       case 'default':
       default:
-        if (this.frame === 50) {
+        if (this.frame === 100) {
           this.fire()
         }
         this.position.x += this.vector.x * this.speed
@@ -228,11 +278,11 @@ class Enemy extends Character {
     ++this.frame
   }
 
-  fire(x = 0.0, y = 1.0) {
+  fire(x = 0.0, y = 1.0, speed = 5.0) {
     for (let i = 0; i < this.shotArray.length; ++i) {
       if (this.shotArray[i].life <= 0) {
         this.shotArray[i].set(this.position.x, this.position.y)
-        this.shotArray[i].setSpeed(10.0)
+        this.shotArray[i].setSpeed(speed)
         this.shotArray[i].setVector(x, y)
         break
       }
@@ -297,7 +347,9 @@ class Shot extends Character {
     }
     if (
       this.position.y + this.height < 0 ||
-      this.position.y - this.height > this.ctx.canvas.height
+      this.position.y - this.height > this.ctx.canvas.height ||
+      this.position.x + this.width < 0 ||
+      this.position.x - this.width > this.ctx.canvas.width
     ) {
       this.life = 0
     }
@@ -327,7 +379,12 @@ class Shot extends Character {
           }
 
           if (v instanceof Enemy === true) {
-            gameScore = Math.min(gameScore + 100, 99999)
+            // 敵によってスコアを変化させる
+            let score = 100
+            if (v.type === 'large') {
+              score = 1000
+            }
+            gameScore = Math.min(gameScore + score, 99999)
           }
         }
         this.life = 0
@@ -404,6 +461,38 @@ class Explosion {
 
     if (progress >= 1.0) {
       this.life = false
+    }
+  }
+}
+
+class BackgroundStar {
+  constructor(ctx, size, speed, color = '#ffffff') {
+    this.ctx = ctx
+    this.size = size
+    this.speed = speed
+    this.color = color
+    this.position = null
+  }
+
+  set(x, y) {
+    this.position = new Position(x, y)
+  }
+
+  update() {
+    // 星の色を設定する
+    this.ctx.fillStyle = this.color
+    // 星の現在位置を速度に応じて動かす
+    this.position.y += this.speed
+    // 星の矩形を描画する
+    this.ctx.fillRect(
+      this.position.x - this.size / 2,
+      this.position.y - this.size / 2,
+      this.size,
+      this.size
+    )
+    // もし画面下端よりも外に出てしまっていたら上端側に戻す
+    if (this.position.y + this.size > this.ctx.canvas.height) {
+      this.position.y = -this.size
     }
   }
 }
