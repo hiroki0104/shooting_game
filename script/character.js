@@ -1,5 +1,14 @@
 // 座標を管理するためのクラス
 class Position {
+  static calcLength(x, y) {
+    return Math.sqrt(x * x + y * y)
+  }
+
+  static calcNormal(x, y) {
+    let len = Position.calcLength(x, y)
+    return new Position(x / len, y / len)
+  }
+
   constructor(x, y) {
     this.x = null
     this.y = null
@@ -19,6 +28,31 @@ class Position {
     let x = this.x - target.x
     let y = this.y - target.y
     return Math.sqrt(x * x + y * y)
+  }
+
+  cross(target) {
+    return this.x * target.y - this.y * target.x
+  }
+
+  normalize() {
+    let l = Math.sqrt(this.x * this.x + this.y * this.y)
+    if (l === 0) {
+      return new Position(0, 0)
+    }
+    // 自身のxy要素を大きさで割る
+    let x = this.x / l
+    let y = this.y / l
+    // 単位化されたベクトルを返す
+    return new Position(x, y)
+  }
+
+  rotate(radian) {
+    let s = Math.sin(radian)
+    let c = Math.cos(radian)
+
+    // 要チェック
+    this.x = this.x * c + this.y * -s
+    this.y = this.x * s + this.y * c
   }
 }
 
@@ -94,7 +128,7 @@ class Viper extends Character {
   }
 
   setComing(startX, startY, endX, endY) {
-    this.life = 1
+    this.life = 5
     this.isComing = true
     this.comingStart = Date.now()
     this.position.set(startX, startY)
@@ -206,15 +240,56 @@ class Enemy extends Character {
     this.shotArray = shotArray
   }
 
+  setAttackTarget(target) {
+    this.attackTarget = target
+  }
+
   update() {
     if (this.life <= 0) {
       return
     }
 
     switch (this.type) {
+      case 'wave':
+        // 配置後のフレームが６０で割り切れるときにショットを放つ
+        if (this.frame % 60 === 0) {
+          let tx = this.attackTarget.position.x - this.position.x
+          let ty = this.attackTarget.position.y - this.position.y
+          // ベクトルを単位化する
+          let tv = Position.calcNormal(tx, ty)
+          // 自機キャラクターに向かうショット
+          this.fire(tv.x, tv.y, 4.0)
+        }
+        // x座礁はサイン波で、ｙ座標は一定量で変化する
+        this.position.x += Math.sin(this.frame / 10)
+        this.position.y += 2.0
+        // 画面外（画面下端）へ移動していたらライフを０
+        if (this.position.y - this.height > this.ctx.canvas.height) {
+          this.life = 0
+        }
+        break
+
+      case 'large':
+        if (this.frame % 50 === 0) {
+          for (let i = 0; i < 360; i += 45) {
+            // 45度間隔のラジアン
+            let r = (i * Math.PI) / 180
+            // ラジアンからサインとコサインを求める
+            let s = Math.sin(r)
+            let c = Math.cos(r)
+            this.fire(c, s, 3.0)
+          }
+        }
+        this.position.x += Math.sin((this.frame + 90) / 50) * 2.0
+        this.position.y += 1.0
+        if (this.position.y - this.height > this.ctx.canvas.hegiht) {
+          this.life = 0
+        }
+        break
+
       case 'default':
       default:
-        if (this.frame === 50) {
+        if (this.frame === 100) {
           this.fire()
         }
         this.position.x += this.vector.x * this.speed
@@ -228,12 +303,113 @@ class Enemy extends Character {
     ++this.frame
   }
 
-  fire(x = 0.0, y = 1.0) {
+  fire(x = 0.0, y = 1.0, speed = 5.0) {
     for (let i = 0; i < this.shotArray.length; ++i) {
       if (this.shotArray[i].life <= 0) {
         this.shotArray[i].set(this.position.x, this.position.y)
-        this.shotArray[i].setSpeed(10.0)
+        this.shotArray[i].setSpeed(speed)
         this.shotArray[i].setVector(x, y)
+        break
+      }
+    }
+  }
+}
+
+class Boss extends Character {
+  constructor(ctx, x, y, w, h, imagePath) {
+    super(ctx, x, y, w, h, 0, imagePath)
+    this.mode = ''
+    this.frame = 0
+    this.speed = 3
+    this.shotArray = null
+    this.homingArray = null
+    this.attackTarget = null
+  }
+
+  set(x, y, life = 1) {
+    this.position.set(x, y)
+    this.life = life
+    this.frame = 0
+  }
+
+  setShotArray(shotArray) {
+    this.shotArray = shotArray
+  }
+
+  setHomingArray(homingArray) {
+    this.homingArray = homingArray
+  }
+
+  setAttackTarget(target) {
+    this.attackTarget = target
+  }
+
+  setMode(mode) {
+    this.mode = mode
+  }
+
+  update() {
+    if (this.life <= 0) {
+      return
+    }
+    switch (this.mode) {
+      case 'invade':
+        this.position.y += this.speed
+        if (this.position.y > 100) {
+          this.position.y = 100
+          this.setMode('floating')
+          this.frame = 0
+        }
+        break
+
+      case 'escape':
+        this.position.y -= this.speed
+        if (this.position.y < -this.height) {
+          this.life = 0
+        }
+        break
+
+      case 'floating':
+        if (this.frame % 1000 < 500) {
+          if (this.frame % 200 > 140 && this.frame % 10 === 0) {
+            let tx = this.attackTarget.position.x - this.position.x
+            let ty = this.attackTarget.position.y - this.position.y
+            let tv = Position.calcNormal(tx, ty)
+            this.fire(tv.x, tv.y)
+          }
+        } else {
+          if (this.frame % 50 === 0) {
+            this.homingFire(0, 1, 3.5)
+          }
+        }
+        // x座礁はサイン波で、
+        this.position.x += Math.cos(this.frame / 100) * 2.0
+        break
+      default:
+        break
+    }
+
+    this.draw()
+    ++this.frame
+  }
+
+  fire(x = 0.0, y = 1.0, speed = 5.0) {
+    for (let i = 0; i < this.shotArray.length; ++i) {
+      if (this.shotArray[i].life <= 0) {
+        this.shotArray[i].set(this.position.x, this.position.y)
+        this.shotArray[i].setSpeed(speed)
+        this.shotArray[i].setVector(x, y)
+        break
+      }
+    }
+  }
+
+  homingFire(x = 0.0, y = 1.0, speed = 3.0) {
+    for (let i = 0; i < this.homingArray.length; ++i) {
+      if (this.homingArray[i].life <= 0) {
+        this.homingArray[i].set(this.position.x, this.position.y)
+        this.homingArray[i].setSpeed(speed)
+        this.homingArray[i].setVector(x, y)
         break
       }
     }
@@ -297,7 +473,9 @@ class Shot extends Character {
     }
     if (
       this.position.y + this.height < 0 ||
-      this.position.y - this.height > this.ctx.canvas.height
+      this.position.y - this.height > this.ctx.canvas.height ||
+      this.position.x + this.width < 0 ||
+      this.position.x - this.width > this.ctx.canvas.width
     ) {
       this.life = 0
     }
@@ -327,7 +505,12 @@ class Shot extends Character {
           }
 
           if (v instanceof Enemy === true) {
-            gameScore = Math.min(gameScore + 100, 99999)
+            // 敵によってスコアを変化させる
+            let score = 100
+            if (v.type === 'large') {
+              score = 1000
+            }
+            gameScore = Math.min(gameScore + score, 99999)
           }
         }
         this.life = 0
@@ -335,6 +518,102 @@ class Shot extends Character {
     })
 
     this.rotationDraw()
+  }
+}
+
+class Homing extends Shot {
+  constructor(ctx, x, y, w, h, imagePath) {
+    super(ctx, x, y, w, h, imagePath)
+    this.frame = 0
+  }
+
+  set(x, y, speed, power) {
+    this.position.set(x, y)
+    this.life = 1
+    this.setSpeed(speed)
+    this.setPower(power)
+    this.frame = 0
+  }
+
+  update() {
+    if (this.life <= 0) {
+      return
+    }
+
+    if (
+      this.position.x + this.width < 0 ||
+      this.position.x - this.width > this.ctx.canvas.width ||
+      this.position.y + this.height < 0 ||
+      this.position.y - this.height > this.ctx.canvas.height
+    ) {
+      this.life = 0
+    }
+
+    // ショットをホーミングさせながら移動させる
+    let target = this.targetArray[0]
+
+    if (this.frame < 100) {
+      let vector = new Position(
+        target.position.x - this.position.x,
+        target.position.y - this.position.y
+      )
+      // 生成したベクトルを単位化する
+      let normalizeVector = vector.normalize()
+      // 自分自身の進行方向ベクトルも単位化
+      this.vector = this.vector.normalize()
+      // 二つの単位化済みベクトルから外積を計算する
+      let cross = this.vector.cross(normalizeVector)
+      // 結果が0.0 -> 真正面か真後ろの方角にいる
+      // 結果がマイナス　-> 右半分の方向にいる
+      // 結果がプラス　-> 左半分の方向にいる
+      let rad = Math.PI / 180.0
+      if (cross > 0.0) {
+        // 右側にターゲットがいるので時計回りに回転させる
+        this.vector.rotate(rad)
+      } else if (cross < 0.0) {
+        // 左側にターゲットがいるので反時計回りに回転させる
+        this.vector.rotate(-rad)
+      }
+    }
+
+    // 進行方向ベクトルをもとに移動させる
+    this.position.x += this.vector.x * this.speed
+    this.position.y += this.vector.y * this.speed
+    // 進行方向からアングルの計算
+    this.angle = Math.atan2(this.vector.y, this.vector.x)
+
+    this.targetArray.map(v => {
+      if (this.life <= 0 || v.life <= 0) {
+        return
+      }
+      let dist = this.position.distance(v.position)
+      if (dist <= (this.width + v.width) / 4) {
+        if (v instanceof Viper === true) {
+          if (v.isComing === true) {
+            return
+          }
+        }
+        v.life -= this.power
+        if (v.life <= 0) {
+          for (let i = 0; i < this.explosionArray.length; ++i) {
+            if (this.explosionArray[i].life !== true) {
+              this.explosionArray[i].set(v.position.x, v.position.y)
+              break
+            }
+          }
+          if (v instanceof Enemy === true) {
+            let score = 100
+            if (v.type === 'large') {
+              score = 1000
+            }
+            gameScore = Math.min(gameScore + score, 99999)
+          }
+        }
+        this.life = 0
+      }
+    })
+    this.rotationDraw()
+    ++this.frame
   }
 }
 
@@ -357,6 +636,8 @@ class Explosion {
     this.firePosition = []
     // 火花の進行方向を格納する
     this.fireVector = []
+    // サウンド再生のためのインスタンス
+    this.sound = null
   }
 
   set(x, y) {
@@ -374,6 +655,15 @@ class Explosion {
 
     this.life = true
     this.startTime = Date.now()
+
+    // サウンドの再生
+    if (this.sound != null) {
+      this.sound.play()
+    }
+  }
+
+  setSound(sound) {
+    this.sound = sound
   }
 
   update() {
@@ -404,6 +694,38 @@ class Explosion {
 
     if (progress >= 1.0) {
       this.life = false
+    }
+  }
+}
+
+class BackgroundStar {
+  constructor(ctx, size, speed, color = '#ffffff') {
+    this.ctx = ctx
+    this.size = size
+    this.speed = speed
+    this.color = color
+    this.position = null
+  }
+
+  set(x, y) {
+    this.position = new Position(x, y)
+  }
+
+  update() {
+    // 星の色を設定する
+    this.ctx.fillStyle = this.color
+    // 星の現在位置を速度に応じて動かす
+    this.position.y += this.speed
+    // 星の矩形を描画する
+    this.ctx.fillRect(
+      this.position.x - this.size / 2,
+      this.position.y - this.size / 2,
+      this.size,
+      this.size
+    )
+    // もし画面下端よりも外に出てしまっていたら上端側に戻す
+    if (this.position.y + this.size > this.ctx.canvas.height) {
+      this.position.y = -this.size
     }
   }
 }
