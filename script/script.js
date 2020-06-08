@@ -37,7 +37,7 @@
       button.disabled = true
       sound = new Sound()
       // 音声データの読み込み準備
-      sound.load('./../sound/explosion.mp3', error => {
+      sound.load('sound/explosion.mp3', error => {
         if (error != null) {
           alert('ファイルの読み込みエラーです')
           return
@@ -57,7 +57,7 @@
       // 爆発エフェクト時に効果音を再生
       explosionArray[i].setSound(sound)
     }
-    viper = new Viper(ctx, 0, 0, 64, 64, './../img/viper.png')
+    viper = new Viper(ctx, 0, 0, 64, 64, 'img/viper.png')
     viper.setComing(
       CANVAS_WWIDTH_HALF, // 登場演出時の開始X座標
       CANVAS_HEIGHT + 50, // 登場演出時の開始Y座標
@@ -74,13 +74,13 @@
         0,
         32,
         32,
-        './../img/enemy_shot.png'
+        'img/enemy_shot.png'
       )
       enemyShotArray[ec].setTargets([viper])
       enemyShotArray[ec].setExplosions(explosionArray)
     }
     for (ec = 0; ec < ENEMY_SMALL_MAX_COUNT; ++ec) {
-      enemyArray[ec] = new Enemy(ctx, 0, 0, 48, 48, './../img/enemy_small.png')
+      enemyArray[ec] = new Enemy(ctx, 0, 0, 48, 48, 'img/enemy_small.png')
       enemyArray[ec].setShotArray(enemyShotArray)
       enemyArray[ec].setAttackTarget(viper)
     }
@@ -91,7 +91,7 @@
         0,
         64,
         64,
-        './../img/enemy_large.png'
+        'img/enemy_large.png'
       )
       enemyArray[ENEMY_SMALL_MAX_COUNT + ec].setShotArray(enemyShotArray)
       enemyArray[ENEMY_SMALL_MAX_COUNT + ec].setAttackTarget(viper)
@@ -105,14 +105,14 @@
         0,
         32,
         32,
-        './../img/homing_shot.png'
+        'img/homing_shot.png'
       )
       homingArray[ec].setTargets([viper])
       homingArray[ec].setExplosions(explosionArray)
     }
 
     // ボスキャラクターの生成
-    boss = new Boss(ctx, 0, 0, 128, 128, './../img/boss.png')
+    boss = new Boss(ctx, 0, 0, 128, 128, 'img/boss.png')
     boss.setShotArray(enemyShotArray)
     boss.setHomingArray(homingArray)
     boss.setAttackTarget(viper)
@@ -120,14 +120,14 @@
     // 自機キャラクターのショットの生成
     let mc
     for (mc = 0; mc < SHOT_MAX_COUNT; ++mc) {
-      shotArray[mc] = new Shot(ctx, 0, 0, 32, 32, './../img/viper_shot.png')
+      shotArray[mc] = new Shot(ctx, 0, 0, 32, 32, 'img/viper_shot.png')
       singleShotArray[mc * 2] = new Shot(
         ctx,
         0,
         0,
         32,
         32,
-        './../img/viper_single_shot.png'
+        'img/viper_single_shot.png'
       )
       singleShotArray[mc * 2 + 1] = new Shot(
         ctx,
@@ -135,7 +135,7 @@
         0,
         32,
         32,
-        './../img/viper_single_shot.png'
+        'img/viper_single_shot.png'
       )
     }
     // 登場シーンからスタートするための設定
